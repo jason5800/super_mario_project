@@ -87,6 +87,96 @@ class CoinRewardWrapper(gym.Wrapper):
         self.num_coins = info['coins']
         return obs, reward, done, info
 
+# 通关奖励
+class PassRewardWrapper(gym.Wrapper):
+    """
+    Overview:
+        add pass reward
+    Interface:
+        ``__init__``, ``step``
+    Properties:
+        - env (:obj:`gym.Env`): the environment to wrap.
+    """
+
+    def __init__(self, env: gym.Env):
+        super().__init__(env)
+
+    def step(self, action):
+        obs, reward, done, info = self.env.step(action)
+        if info['flag_get']:
+            reward = 25
+        return obs, reward, done, info
+
+# 吃蘑菇、花朵奖励
+class MushroomRewardWrapper(gym.Wrapper):
+    """
+    Overview:
+        add mushroom reward
+    Interface:
+        ``__init__``, ``step``
+    Properties:
+        - env (:obj:`gym.Env`): the environment to wrap.
+    """
+
+    def __init__(self, env: gym.Env):
+        super().__init__(env)
+        self.status = 0
+
+    def step(self, action):
+        status_num_map = {'small':0, 'tall':1, 'fireball':2}
+        obs, reward, done, info = self.env.step(action)
+        reward += (status_num_map[info['status']] - self.status) * 1000
+        self.status = status_num_map[info['status']]
+        return obs, reward, done, info
+
+# 卡住惩罚
+class StuckPenaltyWrapper(gym.Wrapper):
+    """
+    Overview:
+        add stuck penalty
+    Interface:
+        ``__init__``, ``step``
+    Properties:
+        - env (:obj:`gym.Env`): the environment to wrap.
+    """
+
+    def __init__(self, env: gym.Env):
+        super().__init__(env)
+        self.x_pos = 0
+        self.y_pos = 0
+        self.action = 0
+
+    def step(self, action):
+        obs, reward, done, info = self.env.step(action)
+        if self.x_pos == info['x_pos'] and self.y_pos == info['y_pos'] and self.action == action:
+            reward -= 1
+        self.x_pos = info['x_pos']
+        self.y_pos = info['y_pos']
+        self.action = action
+        return obs, reward, done, info
+
+class BackgroundRemoveWrapper(gym.ObservationWrapper):
+    def __init__(self, env):
+        super().__init__(env)
+        # ... 重新定义observation_space，例如变为灰度或二值化后的空间 ...
+
+    def observation(self, frame):
+        # 定义蓝色的范围（这些阈值需要根据具体游戏画面调整）
+        background = np.array([104, 136, 252]) # 背景色
+        # 创建掩膜，所有在蓝色范围内的像素变为255（白色），其他为0（黑色）
+        mask = cv2.inRange(frame, background-1, background+1)
+        # 将原图中非蓝色的部分保留，蓝色的部分置为黑色（或其他背景色）
+        frame[mask > 0] = 0
+
+        # 云朵等
+        low_cloud = np.array([250, 250, 250]) # 低云颜色
+        high_cloud = np.array([255, 255, 255]) # 高云颜色
+        # 创建掩膜，所有在低云高云范围内的像素变为255（白色），其他为0（黑色）
+        mask_cloud = cv2.inRange(frame, low_cloud, high_cloud)
+        # 将原图中非低云高云的部分保留，低云高云置为黑色（或其他背景色）
+        frame[mask_cloud > 0] = 0
+
+        return frame
 
 # CAM相关，不需要了解
 def dump_arr2video(arr, video_folder):
@@ -114,7 +204,7 @@ def get_cam(img, model):
     input_tensor = torch.from_numpy(img).unsqueeze(0)
 
     # Construct the CAM object once, and then re-use it on many images:
-    cam = GradCAM(model=model, target_layers=target_layers, use_cuda=True)
+    cam = GradCAM(model=model, target_layers=target_layers)
     targets = None
 
     # You can also pass aug_smooth=True and eigen_smooth=True, to apply smoothing.
@@ -212,8 +302,27 @@ class RecordCAM(gym.Wrapper):
             self.episode_id += 1
 
         if self.recording:
+            # 获取环境原始渲染图像
+            raw_frame = copy.deepcopy(self.env.render(mode='rgb_array'))
+            
+            # 直接在RecordCAM中对原始图像进行BackgroundRemoveWrapper的处理
+            # 定义蓝色的范围（这些阈值需要根据具体游戏画面调整）
+            background = np.array([104, 136, 252]) # 背景色
+            # 创建掩膜，所有在蓝色范围内的像素变为255（白色），其他为0（黑色）
+            mask = cv2.inRange(raw_frame, background-30, background+30)
+            # 将原图中非蓝色的部分保留，蓝色的部分置为黑色（或其他背景色）
+            raw_frame[mask > 0] = 0
+
+            # 云朵等
+            low_cloud = np.array([200, 200, 200]) # 低云颜色
+            high_cloud = np.array([255, 255, 255]) # 高云颜色
+            # 创建掩膜，所有在低云高云范围内的像素变为255（白色），其他为0（黑色）
+            mask_cloud = cv2.inRange(raw_frame, low_cloud, high_cloud)
+            # 将原图中非低云高云的部分保留，低云高云置为黑色（或其他背景色）
+            raw_frame[mask_cloud > 0] = 0
+            
             self.video_recorder.append(
-                (get_cam(observations, model=self.cam_model), copy.deepcopy(self.env.render(mode='rgb_array')))
+                (get_cam(observations, model=self.cam_model), raw_frame)
             )
             self.recorded_frames += 1
             if self.video_length > 0:

@@ -6,7 +6,7 @@ from ding.config import compile_config
 from ding.worker import BaseLearner, SampleSerialCollector, InteractionSerialEvaluator, AdvancedReplayBuffer
 from ding.envs import SyncSubprocessEnvManager, DingEnvWrapper, BaseEnvManager
 from wrapper import MaxAndSkipWrapper, WarpFrameWrapper, ScaledFloatFrameWrapper, FrameStackWrapper, \
-    FinalEvalRewardEnv
+    FinalEvalRewardEnv, StickyActionWrapper, SparseRewardWrapper, CoinRewardWrapper, PassRewardWrapper, MushroomRewardWrapper, StuckPenaltyWrapper
 from policy import DQNPolicy
 from model import DQN
 from ding.utils import set_pkg_seed
@@ -17,6 +17,8 @@ from nes_py.wrappers import JoypadSpace
 from functools import partial
 import os
 import gym_super_mario_bros
+import torch
+import gym
 
 
 # 动作相关配置
@@ -28,6 +30,7 @@ action_nums = [2, 7, 12]
 def wrapped_mario_env(version=0, action=7, obs=1):
     return DingEnvWrapper(
         # 设置mario游戏版本与动作空间
+        # JoypadSpace(gym.make('SuperMarioBrosRandomStages-v'+str(version), stages=['1-1','1-2','1-3','1-4']), action_dict[int(action)]),
         JoypadSpace(gym_super_mario_bros.make("SuperMarioBros-1-1-v"+str(version)), action_dict[int(action)]),
         cfg={
             # 添加各种wrapper
@@ -40,15 +43,26 @@ def wrapped_mario_env(version=0, action=7, obs=1):
                 lambda env: ScaledFloatFrameWrapper(env),
                 # 默认wrapper：叠帧，将连续n_frames帧叠到一起，返回shape为(n_frames,84,84)的图片observation
                 lambda env: FrameStackWrapper(env, n_frames=obs),
+                
+                # 以下是你添加的wrapper
+                # 粘性动作
+                # lambda env: StickyActionWrapper(env),
+                # 吃硬币奖励
+                # lambda env: CoinRewardWrapper(env),
+                # # 通关奖励
+                # lambda env: PassRewardWrapper(env),
+                # # 吃蘑菇、花朵奖励
+                # lambda env: MushroomRewardWrapper(env),
+                # 卡住惩罚
+                # lambda env: StuckPenaltyWrapper(env),
                 # 默认wrapper：在评估一局游戏结束时返回累计的奖励，方便统计
                 lambda env: FinalEvalRewardEnv(env),
-                # 以下是你添加的wrapper
             ]
         }
     )
 
 
-def main(cfg, args, seed=0, max_env_step=int(3e6)):
+def main(cfg, args, seed=0, max_env_step=int(5e6)):
     # Easydict类实例，包含一些配置
     cfg = compile_config(
         cfg,
@@ -80,6 +94,9 @@ def main(cfg, args, seed=0, max_env_step=int(3e6)):
 
     # 采用DQN模型
     model = DQN(**cfg.policy.model)
+    if args.checkpoint is not None:
+        state_dict = torch.load(args.checkpoint, map_location='cpu')
+        model.load_state_dict(state_dict['model'])
     # 采用DQN策略
     policy = DQNPolicy(cfg.policy, model=model)
 
@@ -133,8 +150,11 @@ if __name__ == "__main__":
     parser.add_argument("--action", "-a", type=int, default=7, choices=[2,7,12])
     # 观测空间叠帧数目，不叠帧或叠四帧
     parser.add_argument("--obs", "-o", type=int, default=1, choices=[1,4])
+    # 断点续训
+    parser.add_argument("-ckpt", "--checkpoint", type=str, default=None)
     args = parser.parse_args()
     mario_dqn_config.exp_name = 'exp/v'+str(args.version)+'_'+str(args.action)+'a_'+str(args.obs)+'f_seed'+str(args.seed)
     mario_dqn_config.policy.model.obs_shape=[args.obs, 84, 84]
     mario_dqn_config.policy.model.action_shape=args.action
+    
     main(deepcopy(mario_dqn_config), args, seed=args.seed)

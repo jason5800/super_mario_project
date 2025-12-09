@@ -11,12 +11,19 @@ from ding.envs import DingEnvWrapper
 import gym_super_mario_bros
 from gym_super_mario_bros.actions import SIMPLE_MOVEMENT, COMPLEX_MOVEMENT
 from nes_py.wrappers import JoypadSpace
+import gym
 from wrapper import MaxAndSkipWrapper, WarpFrameWrapper, ScaledFloatFrameWrapper, FrameStackWrapper, \
-    FinalEvalRewardEnv, RecordCAM
+    FinalEvalRewardEnv, RecordCAM, StickyActionWrapper, SparseRewardWrapper, CoinRewardWrapper, PassRewardWrapper, MushroomRewardWrapper, StuckPenaltyWrapper
+import os
 
 action_dict = {2: [["right"], ["right", "A"]], 7: SIMPLE_MOVEMENT, 12: COMPLEX_MOVEMENT}
 action_nums = [2, 7, 12]
 
+class RewardLogger(gym.Wrapper):
+    def step(self, action):
+        obs, reward, done, info = self.env.step(action)
+        print(f"Reward: {reward}, Info: {info}")
+        return obs, reward, done, info
 
 def wrapped_mario_env(model, cam_video_path, version=0, action=2, obs=1):
     return DingEnvWrapper(
@@ -27,8 +34,15 @@ def wrapped_mario_env(model, cam_video_path, version=0, action=2, obs=1):
                 lambda env: WarpFrameWrapper(env, size=84),
                 lambda env: ScaledFloatFrameWrapper(env),
                 lambda env: FrameStackWrapper(env, n_frames=obs),
+                
+                
+                lambda env: CoinRewardWrapper(env),
+                lambda env: PassRewardWrapper(env),
+                lambda env: MushroomRewardWrapper(env),
+                lambda env :StuckPenaltyWrapper(env),
                 lambda env: FinalEvalRewardEnv(env),
-                lambda env: RecordCAM(env, cam_model=model, video_folder=cam_video_path)
+                lambda env: RecordCAM(env, cam_model=model, video_folder=cam_video_path),
+                
             ]
         }
     )
@@ -92,4 +106,5 @@ if __name__ == "__main__":
     ckpt_path = args.checkpoint
     video_dir_path = args.replay_path
     state_dict = torch.load(ckpt_path, map_location='cpu')
+    video_dir_path = os.path.join(video_dir_path, ckpt_path.replace('/', '_'))
     evaluate(args, state_dict=state_dict, seed=args.seed, video_dir_path=video_dir_path, eval_times=1)
