@@ -20,13 +20,13 @@
 ```bash
 cd mario_dqn
 # 评估1-1关卡中能够通过钻入管道，到达地下室，成功获得21个coin的智能体
-python evaluate.py -ckpt pretrained_model/a12_coin_21.pth.tar -a 12 -o 4 -v 0 
+python3 -u evaluate.py -ckpt pretrained_model/a12_coin_21.pth.tar -a 12 -o 4 -v 0 
 
 # 评估1-1关卡中能够获得蘑菇，并且进入地下室，获得18个coin的智能体
-python evaluate.py -ckpt pretrained_model/a12_coin18_tall.pth.tar -a 12 -o 4 -v 0 
+python3 -u evaluate.py -ckpt pretrained_model/a12_coin18_tall.pth.tar -a 12 -o 4 -v 0 
 
 # 评估能够同时通关1-1～1-4关卡的智能体
-python evaluate_multiple_stage.py -ckpt pretrained_model/multi_stage_final_a12.pth.tar -a 12 -o 4 -v 0 
+python3 -u evaluate_multiple_stage.py -ckpt pretrained_model/multi_stage_final_a12.pth.tar -a 12 -o 4 -v 0 
 ```
 ## 项目结构
 - 项目结构
