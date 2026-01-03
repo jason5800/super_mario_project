@@ -2,7 +2,7 @@
 
 本项目为2025-2026学年秋季学期《大数据分析》课程大作业，基于强化学习算法设计超级马里奥兄弟游戏的 AI 智能体。项目基于 [DI-adventure](https://github.com/opendilab/DI-adventure) 框架实现。
 
-项目依赖可通过DI-adventure的文档说明观看。具体再mario_dqn/README.md中。
+项目依赖可通过DI-adventure的文档说明观看。具体在mario_dqn/README.md中。
 
 ## 成果
 - 训练出能够同时通关1-1～1-4关卡的智能体
