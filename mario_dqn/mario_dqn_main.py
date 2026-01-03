@@ -38,7 +38,7 @@ def wrapped_mario_env(version=0, action=7, obs=1):
                 # 默认wrapper：跳帧以降低计算量
                 lambda env: MaxAndSkipWrapper(env, skip=4),
                 # 背景去除
-                # lambda env: BackgroundRemoveWrapper(env),
+                lambda env: BackgroundRemoveWrapper(env),
                 # 默认wrapper：将mario游戏环境图片进行处理，返回大小为84X84的图片observation
                 lambda env: WarpFrameWrapper(env, size=84),
                 # 默认wrapper：将observation数值进行归一化
@@ -49,16 +49,16 @@ def wrapped_mario_env(version=0, action=7, obs=1):
                 # lambda env: SparseRewardWrapper(env),
                 # 以下是你添加的wrapper
                 # 粘性动作
-                lambda env: StickyActionWrapper(env),
+                # lambda env: StickyActionWrapper(env),
                 
                 # 吃硬币奖励
-                # lambda env: CoinRewardWrapper(env),
+                lambda env: CoinRewardWrapper(env),
                 # # # 通关奖励
-                # lambda env: PassRewardWrapper(env),
+                lambda env: PassRewardWrapper(env),
                 # # # 吃蘑菇、花朵奖励
-                # lambda env: MushroomRewardWrapper(env),
+                lambda env: MushroomRewardWrapper(env),
                 # # 卡住惩罚
-                # lambda env: StuckPenaltyWrapper(env),
+                lambda env: StuckPenaltyWrapper(env),
                 # 默认wrapper：在评估一局游戏结束时返回累计的奖励，方便统计
                 
                 lambda env: FinalEvalRewardEnv(env),
