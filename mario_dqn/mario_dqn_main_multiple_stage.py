@@ -60,7 +60,7 @@ def wrapped_mario_env(version=0, action=7, obs=1,stage='1-1'):
                 # 稀疏奖励
                 # lambda env: SparseRewardWrapper(env),
                 # 卡住惩罚
-                # lambda env: StuckPenaltyWrapper(env),
+                lambda env: StuckPenaltyWrapper(env),
                 # 默认wrapper：在评估一局游戏结束时返回累计的奖励，方便统计
                 lambda env: FinalEvalRewardEnv(env),
             ]

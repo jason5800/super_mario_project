@@ -13,7 +13,7 @@ from gym_super_mario_bros.actions import SIMPLE_MOVEMENT, COMPLEX_MOVEMENT
 from nes_py.wrappers import JoypadSpace
 import gym
 from wrapper import MaxAndSkipWrapper, WarpFrameWrapper, ScaledFloatFrameWrapper, FrameStackWrapper, \
-    FinalEvalRewardEnv, RecordCAM, StickyActionWrapper, SparseRewardWrapper, CoinRewardWrapper, PassRewardWrapper, MushroomRewardWrapper, StuckPenaltyWrapper
+    FinalEvalRewardEnv, RecordCAM, StickyActionWrapper, SparseRewardWrapper, CoinRewardWrapper, PassRewardWrapper, MushroomRewardWrapper, StuckPenaltyWrapper, BackgroundRemoveWrapper
 import os
 
 action_dict = {2: [["right"], ["right", "A"]], 7: SIMPLE_MOVEMENT, 12: COMPLEX_MOVEMENT}
@@ -31,6 +31,8 @@ def wrapped_mario_env(model, cam_video_path, version=0, action=2, obs=1):
         cfg={
             'env_wrapper': [
                 lambda env: MaxAndSkipWrapper(env, skip=4),
+                lambda env: BackgroundRemoveWrapper(env),
+
                 lambda env: WarpFrameWrapper(env, size=84),
                 lambda env: ScaledFloatFrameWrapper(env),
                 lambda env: FrameStackWrapper(env, n_frames=obs),
@@ -41,7 +43,7 @@ def wrapped_mario_env(model, cam_video_path, version=0, action=2, obs=1):
                 lambda env: MushroomRewardWrapper(env),
                 lambda env :StuckPenaltyWrapper(env),
                 lambda env: FinalEvalRewardEnv(env),
-                lambda env: RecordCAM(env, cam_model=model, video_folder=cam_video_path),
+                lambda env: RecordCAM(env, cam_model=model, video_folder=cam_video_path, stage_name="1-1"),
                 
             ]
         }

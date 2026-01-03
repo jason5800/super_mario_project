@@ -83,7 +83,7 @@ class CoinRewardWrapper(gym.Wrapper):
 
     def step(self, action):
         obs, reward, done, info = self.env.step(action)
-        reward += (info['coins'] - self.num_coins) * 10
+        reward += (info['coins'] - self.num_coins) * 80
         self.num_coins = info['coins']
         return obs, reward, done, info
 
@@ -104,7 +104,7 @@ class PassRewardWrapper(gym.Wrapper):
     def step(self, action):
         obs, reward, done, info = self.env.step(action)
         if info['flag_get']:
-            reward = 25
+            reward += 100
         return obs, reward, done, info
 
 # 吃蘑菇、花朵奖励
@@ -148,44 +148,53 @@ class StuckPenaltyWrapper(gym.Wrapper):
 
     def step(self, action):
         obs, reward, done, info = self.env.step(action)
-        if self.x_pos == info['x_pos'] and self.y_pos == info['y_pos'] and self.action == action:
+        if self.x_pos == info['x_pos'] and self.y_pos == info['y_pos'] and self.action == action and self.action != 0:
             reward -= 1
         self.x_pos = info['x_pos']
         self.y_pos = info['y_pos']
         self.action = action
         return obs, reward, done, info
-
+# 背景去除
 class BackgroundRemoveWrapper(gym.ObservationWrapper):
     def __init__(self, env):
         super().__init__(env)
         # ... 重新定义observation_space，例如变为灰度或二值化后的空间 ...
 
     def observation(self, frame):
-        # 定义蓝色的范围（这些阈值需要根据具体游戏画面调整）
-        background = np.array([104, 136, 252]) # 背景色
-        # 创建掩膜，所有在蓝色范围内的像素变为255（白色），其他为0（黑色）
+        # 白天背景色
+        background = np.array([104, 136, 252]) 
         mask = cv2.inRange(frame, background-1, background+1)
-        # 将原图中非蓝色的部分保留，蓝色的部分置为黑色（或其他背景色）
         frame[mask > 0] = 0
 
-        # 云朵等
-        low_cloud = np.array([250, 250, 250]) # 低云颜色
-        high_cloud = np.array([255, 255, 255]) # 高云颜色
-        # 创建掩膜，所有在低云高云范围内的像素变为255（白色），其他为0（黑色）
-        mask_cloud = cv2.inRange(frame, low_cloud, high_cloud)
-        # 将原图中非低云高云的部分保留，低云高云置为黑色（或其他背景色）
+        # 云朵外围和分数颜色
+        cloud = np.array([252,252,252])# 高云颜色
+        mask_cloud = cv2.inRange(frame, cloud-1, cloud+1)
         frame[mask_cloud > 0] = 0
+
+        # 云朵内部点缀色
+        in_cloud = np.array([60,188,252])
+        mask_cloud = cv2.inRange(frame, in_cloud-1, in_cloud+1)
+        frame[mask_cloud > 0] = 0
+
+        # 草丛
+        # green = np.array([0,168,0])
+        # mask_green = cv2.inRange(frame, green-1, green+1)
+        # frame[mask_green > 0] = 0
+
+        # green = np.array([184,248,24])
+        # mask_green = cv2.inRange(frame, green-1, green+1)
+        # frame[mask_green > 0] = 0
 
         return frame
 
 # CAM相关，不需要了解
-def dump_arr2video(arr, video_folder):
+def dump_arr2video(arr, video_folder,stage):
     fourcc = cv2.VideoWriter_fourcc(*'MP4V')
     fps = 6
     size = (256, 240)
-    out = cv2.VideoWriter(video_folder + '/cam_pure.mp4', fourcc, fps, size)
-    out1 = cv2.VideoWriter(video_folder + '/obs_pure.mp4', fourcc, fps, size)
-    out2 = cv2.VideoWriter(video_folder + '/merged.mp4', fourcc, fps, size)
+    out = cv2.VideoWriter(video_folder + f'/{stage}_cam_pure.mp4', fourcc, fps, size)
+    out1 = cv2.VideoWriter(video_folder + f'/{stage}_obs_pure.mp4', fourcc, fps, size)
+    out2 = cv2.VideoWriter(video_folder + f'/{stage}_merged.mp4', fourcc, fps, size)
     for frame, obs in arr:
         frame = (255 * frame).astype('uint8').squeeze(0)
         frame_c = cv2.resize(cv2.applyColorMap(frame, cv2.COLORMAP_JET), size)
@@ -232,6 +241,7 @@ class RecordCAM(gym.Wrapper):
         step_trigger: Callable[[int], bool] = None,
         video_length: int = 0,
         name_prefix: str = "rl-video",
+        stage_name: str = "train",
     ):
         super(RecordCAM, self).__init__(env)
         self._env = env
@@ -263,6 +273,7 @@ class RecordCAM(gym.Wrapper):
         self.recorded_frames = 0
         self.is_vector_env = getattr(env, "is_vector_env", False)
         self.episode_id = 0
+        self.stage_name = stage_name
 
     def reset(self, **kwargs):
         observations = super(RecordCAM, self).reset(**kwargs)
@@ -306,20 +317,29 @@ class RecordCAM(gym.Wrapper):
             raw_frame = copy.deepcopy(self.env.render(mode='rgb_array'))
             
             # 直接在RecordCAM中对原始图像进行BackgroundRemoveWrapper的处理
-            # 定义蓝色的范围（这些阈值需要根据具体游戏画面调整）
-            background = np.array([104, 136, 252]) # 背景色
-            # 创建掩膜，所有在蓝色范围内的像素变为255（白色），其他为0（黑色）
-            mask = cv2.inRange(raw_frame, background-30, background+30)
-            # 将原图中非蓝色的部分保留，蓝色的部分置为黑色（或其他背景色）
-            raw_frame[mask > 0] = 0
+            # # 白天背景色
+            # background = np.array([104, 136, 252]) 
+            # mask = cv2.inRange(raw_frame, background-1, background+1)
+            # raw_frame[mask > 0] = 0
 
-            # 云朵等
-            low_cloud = np.array([200, 200, 200]) # 低云颜色
-            high_cloud = np.array([255, 255, 255]) # 高云颜色
-            # 创建掩膜，所有在低云高云范围内的像素变为255（白色），其他为0（黑色）
-            mask_cloud = cv2.inRange(raw_frame, low_cloud, high_cloud)
-            # 将原图中非低云高云的部分保留，低云高云置为黑色（或其他背景色）
-            raw_frame[mask_cloud > 0] = 0
+            # # 云朵外围和分数颜色
+            # cloud = np.array([252,252,252])# 高云颜色
+            # mask_cloud = cv2.inRange(raw_frame, cloud-1, cloud+1)
+            # raw_frame[mask_cloud > 0] = 0
+
+            # # 云朵内部点缀色
+            # in_cloud = np.array([60,188,252])
+            # mask_cloud = cv2.inRange(raw_frame, in_cloud-1, in_cloud+1)
+            # raw_frame[mask_cloud > 0] = 0
+
+            # 草丛
+            # green = np.array([0,168,0])
+            # mask_green = cv2.inRange(raw_frame, green-1, green+1)
+            # raw_frame[mask_green > 0] = 0
+
+            # green = np.array([184,248,24])
+            # mask_green = cv2.inRange(raw_frame, green-1, green+1)
+            # raw_frame[mask_green > 0] = 0
             
             self.video_recorder.append(
                 (get_cam(observations, model=self.cam_model), raw_frame)
@@ -342,7 +362,7 @@ class RecordCAM(gym.Wrapper):
 
     def close_video_recorder(self) -> None:
         if self.recorded_frames > 0:
-            dump_arr2video(self.video_recorder, self.video_folder)
+            dump_arr2video(self.video_recorder, self.video_folder, self.stage_name)
         self.video_recorder = []
         self.recording = False
         self.recorded_frames = 0

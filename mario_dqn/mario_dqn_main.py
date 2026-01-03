@@ -6,7 +6,7 @@ from ding.config import compile_config
 from ding.worker import BaseLearner, SampleSerialCollector, InteractionSerialEvaluator, AdvancedReplayBuffer
 from ding.envs import SyncSubprocessEnvManager, DingEnvWrapper, BaseEnvManager
 from wrapper import MaxAndSkipWrapper, WarpFrameWrapper, ScaledFloatFrameWrapper, FrameStackWrapper, \
-    FinalEvalRewardEnv, StickyActionWrapper, SparseRewardWrapper, CoinRewardWrapper, PassRewardWrapper, MushroomRewardWrapper, StuckPenaltyWrapper
+    FinalEvalRewardEnv, StickyActionWrapper, SparseRewardWrapper, CoinRewardWrapper, PassRewardWrapper, MushroomRewardWrapper, StuckPenaltyWrapper, BackgroundRemoveWrapper
 from policy import DQNPolicy
 from model import DQN
 from ding.utils import set_pkg_seed
@@ -37,25 +37,30 @@ def wrapped_mario_env(version=0, action=7, obs=1):
             'env_wrapper': [
                 # 默认wrapper：跳帧以降低计算量
                 lambda env: MaxAndSkipWrapper(env, skip=4),
+                # 背景去除
+                # lambda env: BackgroundRemoveWrapper(env),
                 # 默认wrapper：将mario游戏环境图片进行处理，返回大小为84X84的图片observation
                 lambda env: WarpFrameWrapper(env, size=84),
                 # 默认wrapper：将observation数值进行归一化
                 lambda env: ScaledFloatFrameWrapper(env),
                 # 默认wrapper：叠帧，将连续n_frames帧叠到一起，返回shape为(n_frames,84,84)的图片observation
                 lambda env: FrameStackWrapper(env, n_frames=obs),
-                
+                # 稀疏奖励
+                # lambda env: SparseRewardWrapper(env),
                 # 以下是你添加的wrapper
                 # 粘性动作
-                # lambda env: StickyActionWrapper(env),
+                lambda env: StickyActionWrapper(env),
+                
                 # 吃硬币奖励
                 # lambda env: CoinRewardWrapper(env),
-                # # 通关奖励
+                # # # 通关奖励
                 # lambda env: PassRewardWrapper(env),
-                # # 吃蘑菇、花朵奖励
+                # # # 吃蘑菇、花朵奖励
                 # lambda env: MushroomRewardWrapper(env),
-                # 卡住惩罚
+                # # 卡住惩罚
                 # lambda env: StuckPenaltyWrapper(env),
                 # 默认wrapper：在评估一局游戏结束时返回累计的奖励，方便统计
+                
                 lambda env: FinalEvalRewardEnv(env),
             ]
         }
